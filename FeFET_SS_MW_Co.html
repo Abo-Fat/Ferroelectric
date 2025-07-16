@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HZO FeFET 交互式技术解读：攻克存储窗口与亚阈值摆幅的挑战</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is designed as a guided narrative to make the complex FeFET report accessible. It starts with the core problem (MW vs. SS trade-off), visualized with an interactive slider and chart. It then branches into two main solution paths (Maximizing MW, Minimizing SS) presented as interactive cards. Next, it synthesizes these into two "Integrated Blueprints" with simple HTML diagrams. Finally, an interactive radar chart allows users to compare different architectures based on the report's data (Table 2). This structure transforms a linear, dense report into a problem-centric, exploratory experience, enhancing user understanding by first establishing the 'why' (the trade-off) before diving into the 'how' (the solutions). -->
+    <!-- Visualization & Content Choices: 
+        1. Core Trade-off: Report Info (MW vs. SS dependence on thickness) -> Goal (Compare, Change) -> Viz (Interactive Line Chart with Slider - Chart.js) -> Interaction (User drags slider to see MW and SS change in real-time) -> Justification (Visually and interactively demonstrates the core conflict, making it tangible).
+        2. Strategies: Report Info (La-doping, MIFIS, FinFET, 2D channels, etc.) -> Goal (Inform, Compare) -> Viz (HTML/Tailwind Cards) -> Interaction (Click to expand/reveal details) -> Justification (Breaks down complex strategies into digestible, self-contained chunks, allowing users to explore at their own pace).
+        3. Architectures: Report Info (FinFET, 2D-FET diagrams) -> Goal (Organize, Compare) -> Viz (HTML/CSS-based diagrams) -> Interaction (Static visual comparison) -> Justification (Provides a simplified visual representation of complex 3D structures without using external graphics, aiding comprehension).
+        4. Comparison: Report Info (Table 2 data) -> Goal (Compare, Relationships) -> Viz (Interactive Radar Chart - Chart.js) -> Interaction (User toggles architectures via checkboxes to compare their performance profiles dynamically) -> Justification (Transforms a static table into an engaging, multi-dimensional comparison tool, making it easy to see the strengths and weaknesses of each approach).
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #FDFBF8;
+            color: #38332E;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 40vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .content-card {
+            background-color: #FFFFFF;
+            border: 1px solid #EAE5E0;
+            transition: all 0.3s ease-in-out;
+        }
+        .content-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .nav-link {
+            transition: color 0.3s;
+        }
+        .nav-link.active {
+            color: #C77D3F;
+            font-weight: 500;
+        }
+        .accent-bg { background-color: #E3A063; }
+        .accent-text { color: #C77D3F; }
+        .subtle-bg { background-color: #F5F1ED; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200/80">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-gray-800">HZO FeFET 技术解读</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#dilemma" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900">核心困境</a>
+                        <a href="#strategies" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900">优化策略</a>
+                        <a href="#blueprints" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900">集成蓝图</a>
+                        <a href="#analysis" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900">架构对比</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <section id="intro" class="text-center mb-16 md:mb-24">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">攻克下一代存储器的核心矛盾</h2>
+            <p class="max-w-3xl mx-auto text-lg text-gray-600">
+                基于HZO的铁电晶体管(FeFET)是构建高速、低功耗非易失性存储器的希望之星。然而，其设计中存在一个根本性挑战：追求“大存储窗口(MW)”和“小亚阈值摆幅(SS)”这两个关键性能指标，在物理上是相互制约的。本应用将带您深入了解这一挑战，并探索最前沿的解决方案。
+            </p>
+        </section>
+
+        <section id="dilemma" class="mb-16 md:mb-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-2">核心困境：鱼与熊掌不可兼得</h2>
+                <p class="max-w-2xl mx-auto text-gray-600">FeFET的性能高度依赖于铁电层(HZO)的厚度。但厚度对MW和SS的影响是相反的。请拖动下面的滑块，直观地感受这个核心权衡关系。</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="chart-container mb-6">
+                    <canvas id="tradeoffChart"></canvas>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm font-medium">HZO 厚度 (nm)</span>
+                    <input id="thicknessSlider" type="range" min="4" max="20" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-bg">
+                    <span id="thicknessValue" class="text-sm font-bold w-12 text-center">10 nm</span>
+                </div>
+                <div id="tradeoffDescription" class="mt-6 p-4 subtle-bg rounded-lg text-center text-gray-700">
+                    在 10 nm 厚度时，MW和SS处于一个平衡点。
+                </div>
+            </div>
+        </section>
+        
+        <section id="strategies" class="mb-16 md:mb-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-2">破局之道：先进优化策略</h2>
+                <p class="max-w-2xl mx-auto text-gray-600">为了打破僵局，研究人员从材料、结构到工艺多维度进行创新。以下是最大化MW和最小化SS的关键策略。点击卡片查看详情。</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-2xl font-semibold mb-4 text-center accent-text">🚀 最大化存储窗口 (MW)</h3>
+                    <div class="space-y-4">
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="mw-1">
+                            <h4 class="font-bold text-lg">镧(La)掺杂</h4>
+                            <p class="text-sm text-gray-500">通过掺杂大原子半径的镧来稳定铁电相，是提升MW和耐久度的王牌策略。</p>
+                            <div id="mw-1" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> La掺杂能显著提高铁电o相的比例，同时抑制非铁电m相，从而获得极高的剩余极化($P_r$)。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> MW可达 <strong>3.3V</strong>，耐久度超过 <strong>10<sup>10</sup></strong> 次，远超传统HZO。</p>
+                            </div>
+                        </div>
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="mw-2">
+                            <h4 class="font-bold text-lg">MIFIS 结构</h4>
+                            <p class="text-sm text-gray-500">在栅叠层顶部增加一个绝缘层，利用电荷补偿机制实现超大MW。</p>
+                            <div id="mw-2" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> 通过在顶部和底部界面俘获相反电荷，补偿去极化场，从而打破传统MW上限。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> 可实现 <strong>3V ~ 9V</strong> 的巨大MW，但可能牺牲数据保持性。</p>
+                            </div>
+                        </div>
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="mw-3">
+                            <h4 class="font-bold text-lg">高k界面层 & 籽晶层</h4>
+                            <p class="text-sm text-gray-500">优化HZO下方的界面层，改善电场分布，促进HZO结晶。</p>
+                            <div id="mw-3" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> 高k材料减少了界面上的电压降，使更多电压施加在HZO上。籽晶层则为HZO提供了更好的生长模板。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> MW增加可达 <strong>80%</strong>，同时改善耐久度。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-semibold mb-4 text-center accent-text">⚡ 最小化亚阈值摆幅 (SS)</h3>
+                    <div class="space-y-4">
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="ss-1">
+                            <h4 class="font-bold text-lg">FinFET / GAA 架构</h4>
+                            <p class="text-sm text-gray-500">采用三维晶体管结构，从多个方向包裹沟道，实现卓越的静电控制。</p>
+                            <div id="ss-1" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> 3D结构极大增强了栅极对沟道的控制能力，天然地抑制了短沟道效应和漏电。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> 在获得巨大MW的同时，SS可低至 <strong>110 mV/dec</strong>，是通向高性能的平台。</p>
+                            </div>
+                        </div>
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="ss-2">
+                            <h4 class="font-bold text-lg">二维(2D)材料沟道</h4>
+                            <p class="text-sm text-gray-500">使用如MoS₂等原子级厚度的材料作为沟道，实现近乎理想的界面和栅控。</p>
+                            <div id="ss-2" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> 原子级平整的范德华界面极大降低了界面陷阱，极致的厚度微缩带来完美静电控制。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> 可实现低于物理极限的SS (<strong>~28 mV/dec</strong>)，耐久度超过 <strong>10<sup>12</sup></strong> 次。</p>
+                            </div>
+                        </div>
+                        <div class="content-card rounded-lg p-4 cursor-pointer" data-target="ss-3">
+                            <h4 class="font-bold text-lg">多步退火工艺</h4>
+                            <p class="text-sm text-gray-500">结合不同气氛的退火，分别优化铁电性和界面质量。</p>
+                            <div id="ss-3" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <p class="text-sm text-gray-700"><strong>机制:</strong> <strong>第一步(N₂):</strong> 高温氮气退火使HZO充分结晶以获得大MW。<strong>第二步(H₂/FG):</strong> 低温含氢退火修复界面缺陷以获得低SS。</p>
+                                <p class="text-sm text-gray-700 mt-1"><strong>效果:</strong> 平衡MW和SS性能的有效工艺手段。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="blueprints" class="mb-16 md:mb-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-2">未来集成蓝图</h2>
+                <p class="max-w-2xl mx-auto text-gray-600">综合上述策略，文献提出了两种最具潜力的集成架构，它们分别针对不同的应用目标，从根本上解耦了MW和SS的矛盾。</p>
+            </div>
+            <div class="grid lg:grid-cols-2 gap-8 items-start">
+                <div class="content-card rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-3">路径一: MIFIS-on-FinFET/GAA</h3>
+                    <p class="text-gray-600 mb-4"><strong>目标：</strong>高密度多级单元(MLC)存储。</p>
+                    <div class="subtle-bg rounded-lg p-4 mb-4 flex justify-center items-center h-48">
+                        <div class="text-center text-xs text-gray-500 w-48">
+                            <div class="bg-gray-400 text-white py-1 rounded-t-md">金属栅 (TiN)</div>
+                            <div class="bg-blue-300 py-1">顶部绝缘层 (Al₂O₃)</div>
+                            <div class="bg-red-300 py-3 font-bold">铁电层 (La:HZO)</div>
+                            <div class="bg-blue-300 py-1">底部绝缘层 (SiON)</div>
+                            <div class="flex justify-center items-end h-16">
+                                <div class="bg-yellow-400 w-16 h-full relative flex justify-center items-end">
+                                    <div class="absolute bg-gray-400 w-full h-2 top-0"></div>
+                                    <span class="font-bold">Fin</span>
+                                </div>
+                            </div>
+                            <div class="bg-green-300 py-1 rounded-b-md">硅衬底</div>
+                            <p class="mt-2 font-semibold">FinFET 3D 结构示意</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-700">此方案融合了FinFET卓越的静电控制能力（保证低SS）和MIFIS结构巨大的存储窗口（实现MLC），是实现高密度存储的理想路径。</p>
+                    <p class="text-sm text-gray-700 mt-2"><strong>挑战：</strong>在复杂3D结构上均匀沉积多层膜的工艺控制，以及MIFIS结构固有的可靠性问题。</p>
+                </div>
+                <div class="content-card rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-3">路径二: 二维沟道 FeFET</h3>
+                    <p class="text-gray-600 mb-4"><strong>目标：</strong>高耐久、超低功耗应用。</p>
+                     <div class="subtle-bg rounded-lg p-4 mb-4 flex justify-center items-center h-48">
+                        <div class="text-center text-xs text-gray-500 w-48">
+                             <div class="bg-gray-400 text-white py-1 rounded-t-md">金属栅 (TiN)</div>
+                             <div class="bg-red-300 py-3 font-bold">铁电层 (HZO)</div>
+                             <div class="bg-blue-300 py-1">绝缘层 (AlOₓ)</div>
+                             <div class="bg-purple-400 text-white h-1 w-full my-1 font-bold flex items-center justify-center">MoS₂</div>
+                             <div class="bg-green-300 py-4 rounded-b-md flex items-center justify-center">衬底/底层电路</div>
+                             <p class="mt-2 font-semibold">2D 沟道结构示意</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-700">此方案利用二维材料近乎完美的界面和极致的厚度来获得最佳的SS和可靠性，优先考虑极致性能而非最大窗口。</p>
+                    <p class="text-sm text-gray-700 mt-2"><strong>挑战：</strong>晶圆级二维材料的生长、转移和低损伤加工工艺仍是主要瓶颈。</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="analysis" class="mb-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-2">多维度性能对比</h2>
+                <p class="max-w-2xl mx-auto text-gray-600">不同的架构在性能、可微缩性和工艺复杂度上各有优劣。勾选下方选项，在雷达图中直观对比各种技术路径的综合表现。</p>
+            </div>
+            <div class="grid lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="chart-container">
+                        <canvas id="comparisonRadarChart"></canvas>
+                    </div>
+                </div>
+                <div class="lg:col-span-1 content-card rounded-lg p-6">
+                    <h4 class="font-bold text-lg mb-4">选择对比架构</h4>
+                    <div id="radar-controls" class="space-y-3">
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-gray-200 mt-16">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-gray-500">
+            <p>这是一个基于公开文献的交互式解读应用，旨在提供教育和研究参考。</p>
+        </div>
+    </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const navLinks = document.querySelectorAll('.nav-link');
+    const sections = document.querySelectorAll('section');
+
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.3
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === entry.target.id) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    }, observerOptions);
+
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+    
+    // Section 1: Trade-off Chart
+    const slider = document.getElementById('thicknessSlider');
+    const thicknessValue = document.getElementById('thicknessValue');
+    const tradeoffDescription = document.getElementById('tradeoffDescription');
+    const tradeoffCtx = document.getElementById('tradeoffChart').getContext('2d');
+
+    const tradeoffChart = new Chart(tradeoffCtx, {
+        type: 'line',
+        data: {
+            labels: ['4nm', '8nm', '12nm', '16nm', '20nm'],
+            datasets: [{
+                label: '存储窗口 (MW) V',
+                data: [0.8, 1.5, 2.2, 2.8, 3.0],
+                borderColor: '#C77D3F',
+                backgroundColor: 'rgba(199, 125, 63, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: '亚阈值摆幅 (SS) mV/dec',
+                data: [75, 90, 120, 160, 210],
+                borderColor: '#4A5568',
+                backgroundColor: 'rgba(74, 85, 104, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: { display: true, text: 'HZO 厚度对 MW 和 SS 的影响' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y + (context.datasetIndex === 0 ? ' V' : ' mV/dec');
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: '存储窗口 (V)' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: '亚阈值摆幅 (mV/dec)' }
+                },
+                x: {
+                    title: { display: false }
+                }
+            }
+        }
+    });
+
+    function updateTradeoff(value) {
+        const mw = 0.8 + (value - 4) * (3.0 - 0.8) / (20 - 4);
+        const ss = 75 + (value - 4) * (210 - 75) / (20 - 4);
+        
+        tradeoffChart.data.datasets[0].data = tradeoffChart.data.labels.map((_, i) => 0.8 + (4*i) * (3.0 - 0.8) / 16);
+        tradeoffChart.data.datasets[1].data = tradeoffChart.data.labels.map((_, i) => 75 + (4*i) * (210 - 75) / 16);
+        
+        // Add a visual indicator
+        if (!tradeoffChart.options.plugins.annotation) {
+             tradeoffChart.options.plugins.annotation = {
+                annotations: {
+                    line1: {
+                        type: 'line',
+                        xMin: (value-4)/4,
+                        xMax: (value-4)/4,
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderWidth: 2,
+                        borderDash: [6, 6]
+                    }
+                }
+            };
+        } else {
+            tradeoffChart.options.plugins.annotation.annotations.line1.xMin = (value-4)/4;
+            tradeoffChart.options.plugins.annotation.annotations.line1.xMax = (value-4)/4;
+        }
+
+        tradeoffChart.update();
+
+        thicknessValue.textContent = `${value} nm`;
+        if (value < 8) {
+            tradeoffDescription.textContent = `在 ${value} nm 的薄层下，SS表现更优，但MW被严重压缩，不利于数据区分。`;
+        } else if (value > 16) {
+            tradeoffDescription.textContent = `在 ${value} nm 的厚层下，MW变得非常宽，但SS显著劣化，导致功耗增加。`;
+        } else {
+            tradeoffDescription.textContent = `在 ${value} nm 厚度时，MW和SS处于一个经典的权衡区域。`;
+        }
+    }
+
+    slider.addEventListener('input', (e) => {
+        updateTradeoff(parseInt(e.target.value));
+    });
+    updateTradeoff(parseInt(slider.value));
+
+    // Section 2: Strategy Cards
+    const strategyCards = document.querySelectorAll('[data-target]');
+    strategyCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const targetId = card.dataset.target;
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                targetElement.classList.toggle('hidden');
+                card.classList.toggle('subtle-bg');
+            }
+        });
+    });
+
+
+    // Section 4: Radar Chart
+    const radarCtx = document.getElementById('comparisonRadarChart').getContext('2d');
+    const radarControls = document.getElementById('radar-controls');
+
+    const radarData = {
+        '平面MFIS': { data: [2, 2, 2, 2, 9], color: 'rgba(239, 68, 68, 0.4)' },
+        '平面MIFIS': { data: [9, 2, 2, 4, 4], color: 'rgba(59, 130, 246, 0.4)' },
+        'FinFET/GAA MFIS': { data: [7, 7, 9, 7, 6], color: 'rgba(34, 197, 94, 0.4)' },
+        'FinFET/GAA MIFIS': { data: [10, 7, 9, 8, 3], color: 'rgba(249, 115, 22, 0.4)' },
+        '2D-沟道 MFIS': { data: [7, 10, 10, 1, 7], color: 'rgba(168, 85, 247, 0.4)' },
+    };
+
+    const initialSelection = ['平面MFIS', 'FinFET/GAA MFIS', '2D-沟道 MFIS'];
+
+    Object.keys(radarData).forEach(key => {
+        const isChecked = initialSelection.includes(key);
+        radarControls.innerHTML += `
+            <div class="flex items-center">
+                <input id="radar-${key}" name="radar-arch" type="checkbox" ${isChecked ? 'checked' : ''} value="${key}" class="h-4 w-4 rounded border-gray-300 focus:ring-0" style="color: ${radarData[key].color.replace('0.4', '1')}">
+                <label for="radar-${key}" class="ml-3 block text-sm font-medium text-gray-700">${key}</label>
+            </div>
+        `;
+    });
+
+    const comparisonRadarChart = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: ['大MW潜力', '低SS潜力', '可微缩性', '工艺复杂度(低)', '可靠性(高)'],
+            datasets: []
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            elements: {
+                line: {
+                    borderWidth: 2
+                }
+            },
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: 10,
+                    ticks: {
+                       stepSize: 2
+                    },
+                    pointLabels: {
+                        font: {
+                           size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}`;
+                        }
+                    }
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    function updateRadarChart() {
+        const selectedArchs = Array.from(document.querySelectorAll('#radar-controls input:checked')).map(el => el.value);
+        comparisonRadarChart.data.datasets = selectedArchs.map(key => ({
+            label: key,
+            data: radarData[key].data,
+            backgroundColor: radarData[key].color,
+            borderColor: radarData[key].color.replace('0.4', '1'),
+            pointBackgroundColor: radarData[key].color.replace('0.4', '1'),
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: radarData[key].color.replace('0.4', '1')
+        }));
+        comparisonRadarChart.update();
+    }
+
+    document.querySelectorAll('#radar-controls input').forEach(input => {
+        input.addEventListener('change', updateRadarChart);
+    });
+
+    updateRadarChart();
+});
+</script>
+
+</body>
+</html>
